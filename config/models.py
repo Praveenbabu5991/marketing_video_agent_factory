@@ -7,12 +7,11 @@ capabilities and requirements.
 
 Environment Variables:
     DEFAULT_MODEL: Default model for agents without specific config
-    ORCHESTRATOR_MODEL: Model for root orchestrator
-    STRATEGY_MODEL: Model for video strategy agent
-    SCRIPT_MODEL: Model for script writing agent
-    PRODUCTION_MODEL: Model for video production agent
-    OPTIMIZATION_MODEL: Model for optimization agent
-    VIDEO_MODEL: Model for video generation
+    ORCHESTRATOR_MODEL: Model for root orchestrator (VideoStudioManager)
+    VIDEO_AGENT_MODEL: Model for video agent
+    ANIMATION_AGENT_MODEL: Model for animation agent
+    CAPTION_AGENT_MODEL: Model for caption agent
+    VIDEO_MODEL: Model for video generation (Veo)
 """
 
 import os
@@ -97,10 +96,9 @@ MODELS: Dict[str, ModelConfig] = {
 # Default models per agent type
 DEFAULT_AGENT_MODELS = {
     "orchestrator": "gemini-2.5-flash",
-    "strategy": "gemini-2.5-flash",
-    "script": "gemini-2.5-flash",
-    "production": "gemini-2.5-flash",
-    "optimization": "gemini-2.5-flash",
+    "video_agent": "gemini-2.5-flash",
+    "animation_agent": "gemini-2.5-flash",
+    "caption_agent": "gemini-2.5-flash",
     "video": "veo-3.1-generate-preview",
 }
 
@@ -160,36 +158,20 @@ def get_provider_api_key(provider: ModelProvider) -> Optional[str]:
 
 
 # =============================================================================
-# Convenience Functions for Common Agent Types
+# Convenience Functions
 # =============================================================================
+
+# Primary function used by agents
+get_model_for_agent = get_agent_model
+
 
 def get_orchestrator_model() -> str:
     """Get model for orchestrator agent."""
     return get_agent_model("orchestrator")
 
 
-def get_strategy_model() -> str:
-    """Get model for strategy agent."""
-    return get_agent_model("strategy")
-
-
-def get_script_model() -> str:
-    """Get model for script writing agent."""
-    return get_agent_model("script")
-
-
-def get_production_model() -> str:
-    """Get model for production agent."""
-    return get_agent_model("production")
-
-
-def get_optimization_model() -> str:
-    """Get model for optimization agent."""
-    return get_agent_model("optimization")
-
-
 def get_video_model() -> str:
-    """Get model for video generation."""
+    """Get model for video generation (Veo)."""
     return get_agent_model("video")
 
 

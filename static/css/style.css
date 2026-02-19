@@ -353,6 +353,9 @@ body {
     padding: var(--space-md) var(--space-lg);
     border-top: 1px solid #334155;
     background: #0f172a;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
 }
 
 .chat-input-wrapper {
@@ -367,6 +370,16 @@ body {
 
 .chat-input-wrapper:focus-within {
     box-shadow: 0 0 0 2px var(--primary);
+}
+
+.chat-input-wrapper.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.send-btn.disabled {
+    opacity: 0.5;
+    pointer-events: none;
 }
 
 .tab-switch-btn, .send-btn {
@@ -2612,6 +2625,8 @@ body {
     margin-top: 12px;
     padding-top: 12px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
+    max-height: 200px;
+    overflow-y: auto;
 }
 
 .choice-button {
@@ -2703,12 +2718,12 @@ body {
 
 /* Chat input hint above input field */
 .chat-input-hint {
-    padding: 8px 16px;
-    font-size: 0.75rem;
+    padding: 4px 16px;
+    font-size: 0.7rem;
     color: #8b5cf6;
-    background: rgba(139, 92, 246, 0.1);
-    border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+    background: transparent;
     text-align: center;
+    opacity: 0.8;
 }
 
 /* =========================================================================

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Optional
 from contextlib import contextmanager
 
-from memory.state import SessionState, WorkflowState, BrandContext, VideoContext, MarketingContext
+from memory.state import SessionState, WorkflowState, BrandContext, VideoContext, MarketingContext, UserUploadedImage
 
 
 class DatabaseManager:
@@ -346,6 +346,68 @@ def recall_from_memory(category: str, key: str = None) -> dict:
         return {"status": "success", "data": content}
     
     return {"status": "error", "message": f"Unknown category: {category}"}
+
+
+def get_brand_context(session_id: str = "") -> dict:
+    """
+    Retrieve structured brand context for video generation.
+
+    Call this BEFORE generating any video to get brand colors, logo, tone,
+    target audience, and other marketing data that should be baked into the video.
+
+    Args:
+        session_id: The current session ID. If empty, uses the most recent session.
+
+    Returns:
+        dict with keys: name, colors, logo_path, tone, industry, target_audience,
+        company_overview, products_services, brand_messaging, marketing_goals,
+        user_images (list of {path, usage_intent}), reference_images.
+        Returns {"status": "no_brand_context"} if nothing is found.
+    """
+    store = get_memory_store()
+
+    session = None
+    if session_id:
+        session = store.get_session(session_id)
+
+    # Fallback: try to find most recent session with brand data
+    if session is None:
+        with store.db.get_connection() as conn:
+            row = conn.execute(
+                "SELECT state_json FROM sessions ORDER BY updated_at DESC LIMIT 1"
+            ).fetchone()
+            if row:
+                session = SessionState.from_dict(json.loads(row["state_json"]))
+
+    if session is None or not session.brand.name:
+        return {"status": "no_brand_context"}
+
+    brand = session.brand
+    mc = brand.marketing_context
+
+    user_imgs = []
+    for img in brand.user_images:
+        if isinstance(img, UserUploadedImage):
+            user_imgs.append({"path": img.path, "usage_intent": img.usage_intent})
+        elif isinstance(img, dict):
+            user_imgs.append({"path": img.get("path", ""), "usage_intent": img.get("usage_intent", "auto")})
+
+    return {
+        "status": "success",
+        "name": brand.name,
+        "colors": brand.colors,
+        "logo_path": brand.logo_path or "",
+        "tone": brand.tone,
+        "industry": brand.industry,
+        "overview": brand.overview,
+        "target_audience": mc.target_audience,
+        "company_overview": mc.company_overview,
+        "products_services": mc.products_services,
+        "brand_messaging": mc.brand_messaging,
+        "marketing_goals": mc.marketing_goals,
+        "user_images": user_imgs,
+        "reference_images": brand.reference_images,
+    }
 
 
 def get_or_create_project(

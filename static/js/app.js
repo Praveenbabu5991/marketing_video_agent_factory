@@ -1585,26 +1585,80 @@ class MarketingVideoApp {
         }
     }
     
+    updateProcessingForVideoGeneration(statusMessage) {
+        // Stop the generic status cycle — we have real status from backend
+        if (this.statusInterval) {
+            clearInterval(this.statusInterval);
+            this.statusInterval = null;
+        }
+
+        const titleEl = document.querySelector('#processingIndicator .processing-title');
+        const statusEl = document.getElementById('processingStatus');
+        const progressBar = document.getElementById('processingProgressBar');
+
+        if (titleEl) {
+            titleEl.innerHTML = `
+                Video Generation in Progress
+                <span class="processing-dots"><span></span><span></span><span></span></span>
+            `;
+        }
+        if (statusEl) {
+            statusEl.textContent = statusMessage;
+        }
+
+        // Start a slow progress animation for video gen (40% → 95% over ~120s)
+        if (progressBar && !this.videoProgressInterval) {
+            let videoProgress = 40;
+            progressBar.style.width = `${videoProgress}%`;
+
+            const videoStartTime = Date.now();
+            this.videoProgressInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - videoStartTime) / 1000);
+
+                // Slow progress: approach 95% asymptotically
+                videoProgress = Math.min(95, 40 + (55 * (1 - Math.exp(-elapsed / 80))));
+                progressBar.style.width = `${videoProgress}%`;
+
+                // Update subtitle with time-based messages
+                if (statusEl && this.isProcessing) {
+                    if (elapsed > 90) {
+                        statusEl.textContent = 'Finalizing your video...';
+                    } else if (elapsed > 60) {
+                        statusEl.textContent = 'Almost there — adding finishing touches...';
+                    } else if (elapsed > 30) {
+                        statusEl.textContent = 'Rendering frames — this takes a moment...';
+                    }
+                }
+            }, 2000);
+        }
+    }
+
     hideProcessingIndicator() {
         this.isProcessing = false;
-        
+
         // Clear status cycle
         if (this.statusInterval) {
             clearInterval(this.statusInterval);
             this.statusInterval = null;
         }
-        
+
         // Clear time tracker
         if (this.timeInterval) {
             clearInterval(this.timeInterval);
             this.timeInterval = null;
         }
-        
+
+        // Clear video progress timer
+        if (this.videoProgressInterval) {
+            clearInterval(this.videoProgressInterval);
+            this.videoProgressInterval = null;
+        }
+
         // Re-enable input
         const inputWrapper = document.querySelector('.chat-input-wrapper');
         inputWrapper?.classList.remove('disabled');
         this.sendBtn.classList.remove('disabled');
-        
+
         // Remove processing message
         document.getElementById('processingIndicator')?.remove();
     }
@@ -1630,12 +1684,70 @@ class MarketingVideoApp {
                         
                         if (data.type === 'session') {
                             this.sessionId = data.session_id;
+                        } else if (data.type === 'status') {
+                            // Handle status events (e.g., "Generating your video...")
+                            // Do NOT hide processing indicator — video gen takes 1-2 minutes
+                            // Instead, update the indicator with the real status
+                            const statusMsg = data.message || 'Processing...';
+                            this.updateProcessingForVideoGeneration(statusMsg);
+                        } else if (data.type === 'video_generated') {
+                            // Handle dedicated video generation event
+                            const videoUrl = data.url;
+                            if (videoUrl && !this.generatedImages.includes(videoUrl)) {
+                                this.generatedImages.push(videoUrl);
+                                const caption = data.caption || '';
+                                const hashtags = data.hashtags || [];
+                                if (caption || hashtags.length > 0) {
+                                    this.addVideoToGalleryWithCaption(videoUrl, caption, hashtags);
+                                } else {
+                                    this.addImageToGallery(videoUrl);
+                                }
+                                this.saveImagesToStorage();
+                            }
                         } else if (data.type === 'text') {
+                            // Detect structured JSON from format_response_for_user
+                            // Check for: wrapper format OR direct structured JSON
+                            const contentTrimmed = data.content.trim();
+                            const isStructuredContent = (
+                                // Wrapper format: {'result': '...'} or {"result": "..."}
+                                ((contentTrimmed.includes("{'result':") || contentTrimmed.includes('{"result":')) &&
+                                 contentTrimmed.includes('has_choices')) ||
+                                // Direct structured JSON: {"text": "...", "has_choices": ...}
+                                (contentTrimmed.startsWith('{') && contentTrimmed.includes('"has_choices"') &&
+                                 contentTrimmed.includes('"text"'))
+                            );
+
+                            if (isStructuredContent) {
+                                // Try to extract structured response from this chunk
+                                const structuredResponse = this.parseStructuredResponse(data.content);
+                                if (structuredResponse) {
+                                    // Hide processing indicator when first content arrives
+                                    if (!firstContentReceived) {
+                                        firstContentReceived = true;
+                                        this.hideProcessingIndicator();
+                                    }
+                                    if (!messageElement) {
+                                        messageElement = this.addMessage('', 'assistant', true);
+                                    }
+                                    // Use only the text from structured response, not the wrapper/JSON
+                                    assistantMessage = structuredResponse.text;
+                                    this.handleStructuredResponse(structuredResponse, messageElement);
+                                    // Don't accumulate the wrapper text
+                                    continue;
+                                } else {
+                                    // If we can't parse it, skip it entirely - don't display raw JSON
+                                    console.log('⚠️ Skipping structured chunk that could not be parsed');
+                                    continue;
+                                }
+                            }
+
                             // Hide processing indicator when first content arrives
                             if (!firstContentReceived) {
                                 firstContentReceived = true;
                                 this.hideProcessingIndicator();
                             }
+
+                            // Regular text streaming
                             assistantMessage += data.content;
                             if (!messageElement) {
                                 messageElement = this.addMessage('', 'assistant', true);
@@ -1647,6 +1759,10 @@ class MarketingVideoApp {
 
                             if (structuredResponse) {
                                 // Handle structured response with choices
+                                // Clear any accumulated wrapper text
+                                if (messageElement) {
+                                    messageElement.innerHTML = '';
+                                }
                                 this.handleStructuredResponse(structuredResponse, messageElement);
                             } else {
                                 // Fallback: Handle as regular text response
@@ -1665,6 +1781,11 @@ class MarketingVideoApp {
                                 }
                             }
 
+                            // ALWAYS scan full message for video/media URLs
+                            // (structured response text may not contain the video URL)
+                            this.parseAssistantResponse(assistantMessage);
+                            this.updateRightPanel(assistantMessage);
+
                             // Save to storage now that streaming is complete
                             this.saveMessagesToStorage();
                         }
@@ -1673,8 +1794,8 @@ class MarketingVideoApp {
             }
         }
         
-        // If no content was received, hide processing indicator
-        if (!firstContentReceived) {
+        // Always ensure processing indicator is cleaned up when stream ends
+        if (this.isProcessing) {
             this.hideProcessingIndicator();
         }
     }
@@ -3668,12 +3789,75 @@ class MarketingVideoApp {
      */
     parseStructuredResponse(text) {
         try {
+            // Pattern 0: Tool result wrapper - {'result': '{"text": "...", "has_choices": ...}'}
+            // This is a Python dict literal that ADK returns when a tool is called
+            // We need to extract the inner JSON string from the 'result' field
+            
+            // Check if it starts with the wrapper pattern
+            if (text.trim().startsWith("{'result':") || text.trim().startsWith('{"result":')) {
+                try {
+                    // Try to extract using regex first (simpler)
+                    const wrapperMatch = text.match(/['"]result['"]\s*:\s*['"]([^'"]+)['"]/);
+                    if (wrapperMatch) {
+                        let jsonStr = wrapperMatch[1];
+                        
+                        // Unescape: handle \n, \", \uXXXX, etc.
+                        jsonStr = jsonStr
+                            .replace(/\\n/g, '\n')
+                            .replace(/\\r/g, '\r')
+                            .replace(/\\t/g, '\t')
+                            .replace(/\\"/g, '"')
+                            .replace(/\\'/g, "'")
+                            .replace(/\\\\/g, '\\');
+                        
+                        // Handle unicode escapes like \ud83c\udfa8
+                        jsonStr = jsonStr.replace(/\\u([0-9a-fA-F]{4})/g, (match, code) => {
+                            return String.fromCharCode(parseInt(code, 16));
+                        });
+                        
+                        const parsed = JSON.parse(jsonStr);
+                        if (parsed.text !== undefined && parsed.has_choices !== undefined) {
+                            console.log('📋 Parsed tool result wrapper - extracted inner JSON');
+                            return parsed;
+                        }
+                    }
+                } catch (e) {
+                    console.log('Failed to parse wrapper:', e);
+                }
+            }
+            
             // Pattern 1: Pure JSON response
             if (text.trim().startsWith('{') && text.trim().endsWith('}')) {
                 const parsed = JSON.parse(text.trim());
                 if (parsed.text !== undefined && parsed.has_choices !== undefined) {
                     console.log('📋 Parsed pure JSON structured response');
                     return parsed;
+                }
+                // Check if it's wrapped in a result field
+                if (parsed.result && typeof parsed.result === 'string') {
+                    try {
+                        const innerParsed = JSON.parse(parsed.result);
+                        if (innerParsed.text !== undefined && innerParsed.has_choices !== undefined) {
+                            console.log('📋 Parsed nested result field structured response');
+                            return innerParsed;
+                        }
+                    } catch (e) {
+                        // Try unescaping
+                        try {
+                            const unescaped = parsed.result
+                                .replace(/\\n/g, '\n')
+                                .replace(/\\"/g, '"')
+                                .replace(/\\'/g, "'")
+                                .replace(/\\\\/g, '\\');
+                            const innerParsed = JSON.parse(unescaped);
+                            if (innerParsed.text !== undefined && innerParsed.has_choices !== undefined) {
+                                console.log('📋 Parsed nested result field (unescaped) structured response');
+                                return innerParsed;
+                            }
+                        } catch (e2) {
+                            // Continue to other patterns
+                        }
+                    }
                 }
             }
 
@@ -3733,6 +3917,8 @@ class MarketingVideoApp {
 
         // Update the message text (render markdown)
         if (messageElement) {
+            // Clear any existing content first
+            messageElement.innerHTML = '';
             this.updateMessage(messageElement, response.text);
         }
 
@@ -3757,6 +3943,9 @@ class MarketingVideoApp {
         if (response.input_hint && response.allow_free_input) {
             this.showInputHint(response.input_hint);
         }
+
+        // Scroll to bottom after choices render
+        setTimeout(() => this.scrollToBottom(), 100);
     }
 
     /**
@@ -3844,12 +4033,19 @@ class MarketingVideoApp {
         // Remove existing hint
         this.hideInputHint();
 
+        // Place hint ABOVE the input wrapper (in the container), not inside it
+        const inputContainer = document.querySelector('.chat-input-container');
         const inputWrapper = document.querySelector('.chat-input-wrapper');
-        if (inputWrapper) {
+        if (inputContainer && inputWrapper) {
             const hint = document.createElement('div');
             hint.className = 'chat-input-hint';
             hint.textContent = hintText;
-            inputWrapper.insertBefore(hint, inputWrapper.firstChild);
+            inputContainer.insertBefore(hint, inputWrapper);
+        }
+
+        // Also set as placeholder so it's visible in the textarea itself
+        if (this.chatInput && hintText) {
+            this.chatInput.placeholder = hintText;
         }
     }
 
@@ -3858,6 +4054,9 @@ class MarketingVideoApp {
      */
     hideInputHint() {
         document.querySelector('.chat-input-hint')?.remove();
+        if (this.chatInput) {
+            this.chatInput.placeholder = 'Type your response...';
+        }
     }
 
     // =========================================================================
@@ -3959,7 +4158,35 @@ class MarketingVideoApp {
             }
         }
 
-        // Only return choices if we found meaningful options (2-6 choices typically)
+        // Pattern 5: Numbered concepts/ideas - "1. Title" or "**1. Title**"
+        if (choices.length === 0) {
+            const numberedPattern = /(?:^|\n)\s*\*?\*?(\d+)\.\s+\*?\*?([^\n*]+?)(?:\*\*)?(?:\n|$)/g;
+            const conceptKeywords = /concept|idea|option|video|hook|key message|duration|goal/i;
+            
+            if (conceptKeywords.test(text)) {
+                while ((match = numberedPattern.exec(text)) !== null) {
+                    const num = match[1];
+                    let title = match[2].trim().replace(/\*\*/g, '');
+                    if (title.length > 60) title = title.substring(0, 57) + '...';
+                    if (title.length < 3) continue;
+                    
+                    const emojiMap = {'1': '1️⃣', '2': '2️⃣', '3': '3️⃣', '4': '4️⃣', '5': '5️⃣'};
+                    const key = `idea_${num}`;
+                    
+                    if (!seenLabels.has(key)) {
+                        seenLabels.add(key);
+                        choices.push({
+                            icon: emojiMap[num] || '🔢',
+                            label: `Idea ${num}: ${title}`,
+                            value: num,
+                            description: ''
+                        });
+                    }
+                }
+            }
+        }
+
+        // Only return choices if we found meaningful options (2-8 choices typically)
         if (choices.length >= 2 && choices.length <= 8) {
             return choices;
         }
