@@ -99,6 +99,7 @@ DEFAULT_AGENT_MODELS = {
     "video_agent": "gemini-2.5-flash",
     "animation_agent": "gemini-2.5-flash",
     "caption_agent": "gemini-2.5-flash",
+    "campaign_agent": "gemini-2.5-flash",
     "video": "veo-3.1-generate-preview",
 }
 

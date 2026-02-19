@@ -132,9 +132,36 @@ generate_video(
 )
 ```
 
-### Step 6: Present Result
+### Step 6: Present Result with Auto-Caption
 
-Show the generated video URL, suggest caption and hashtags.
+After `generate_video` returns successfully:
+
+1. **IMMEDIATELY call `write_caption()`**:
+```python
+write_caption(
+    topic="[the video concept/theme]",
+    brand_voice="[brand tone from get_brand_context]",
+    target_audience="[target audience]",
+    key_message="[the video's key message]",
+    occasion="[event if applicable]",
+    brand_name="[brand name]",
+    image_description="[brief description of what the video shows]"
+)
+```
+
+2. **IMMEDIATELY call `generate_hashtags()`**:
+```python
+generate_hashtags(
+    topic="[video theme]",
+    niche="[brand industry]",
+    brand_name="[brand name]",
+    max_hashtags=15
+)
+```
+
+3. **Present the complete video post** with video URL, caption, and hashtags together.
+
+4. **Call `format_response_for_user`** with the updated 5 choices (see Video Complete below).
 
 ## FINDING USER IMAGES
 
@@ -166,9 +193,9 @@ force_choices='[{"id": "generate", "label": "Generate Video!", "value": "yes", "
 choice_type="confirmation"
 ```
 
-**Video Complete:**
+**Video Complete (with Caption + Campaign options):**
 ```python
-force_choices='[{"id": "perfect", "label": "Perfect!", "value": "done", "icon": "✅"}, {"id": "style", "label": "Try different style", "value": "different style", "icon": "🎨"}, {"id": "new", "label": "New video", "value": "new video", "icon": "🎬"}]'
+force_choices='[{"id": "perfect", "label": "Perfect!", "value": "done", "icon": "✅"}, {"id": "style", "label": "Try Different Style", "value": "different style", "icon": "🎨"}, {"id": "caption", "label": "Improve Caption", "value": "improve caption", "icon": "✏️"}, {"id": "campaign", "label": "Create Campaign", "value": "create campaign", "icon": "📅"}, {"id": "new", "label": "New Video", "value": "new video", "icon": "🎬"}]'
 choice_type="menu"
 ```
 
@@ -181,8 +208,9 @@ choice_type="menu"
 5. **Colors in prompt** — include hex color codes directly in the Veo prompt
 6. **Ideas first** — suggest 3 ideas before generating
 7. **Brief before generate** — show the video brief and get approval
-8. **Reels-optimized** — default 9:16, 8 seconds
-9. **Engaging hooks** — first 3 seconds must grab attention
+8. **Auto-caption after video** — ALWAYS call write_caption + generate_hashtags after video generates, present video + caption + hashtags together
+9. **Reels-optimized** — default 9:16, 8 seconds
+10. **Engaging hooks** — first 3 seconds must grab attention
 """
 
 
