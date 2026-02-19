@@ -551,6 +551,7 @@ async def chat_stream(request: ChatRequest):
         
         collected_response = ""
         has_format_response = False
+        last_structured_text = ""  # Track text from structured response to detect plain text duplicates
         
         try:
             async for event in runner.run_async(
@@ -564,11 +565,28 @@ async def chat_stream(request: ChatRequest):
                 sys.stdout.flush()
 
                 if event.content and event.content.parts:
+                    # First pass: check if this event contains a format_response_for_user call
+                    # If so, skip text parts in this event (they're pre-echoes of the structured response)
+                    event_has_format_call = False
+                    for _p in event.content.parts:
+                        if hasattr(_p, 'function_call') and _p.function_call:
+                            _fn = _p.function_call.name if hasattr(_p.function_call, 'name') else ""
+                            if 'format_response' in _fn.lower():
+                                event_has_format_call = True
+                                break
+
                     for part in event.content.parts:
                         # Handle text parts
                         if hasattr(part, 'text') and part.text:
                             text_content = part.text
-                            
+
+                            # Skip text in events that also have a format_response_for_user call
+                            # (the text is a pre-echo that will be duplicated by the structured response)
+                            if event_has_format_call and not ('has_choices' in text_content and text_content.strip().startswith('{')):
+                                print(f"⏭️  Skipping pre-echo text [{len(text_content)} chars] (event has format_response call)", flush=True)
+                                sys.stdout.flush()
+                                continue
+
                             # CRITICAL FIX: Extract JSON from tool result wrapper {'result': '...'}
                             # ADK wraps tool outputs as: {'result': '{"text":"...","has_choices":...}'}
                             # ast.literal_eval fails on \\'ve patterns, so use regex extraction
@@ -625,6 +643,13 @@ async def chat_stream(request: ChatRequest):
                                 if extracted_json:
                                     yield f"data: {json.dumps({'type': 'text', 'content': extracted_json})}\n\n"
                                     collected_response += extracted_json
+                                    # Extract text field to detect plain text duplicates later
+                                    try:
+                                        _ej = json.loads(extracted_json)
+                                        if isinstance(_ej, dict) and _ej.get('text'):
+                                            last_structured_text = _ej['text'][:100]
+                                    except:
+                                        pass
                                 else:
                                     print("⚠️  Skipping unparseable wrapper chunk", flush=True)
                                     sys.stdout.flush()
@@ -637,21 +662,35 @@ async def chat_stream(request: ChatRequest):
                                 if isinstance(parsed, dict) and 'has_choices' in parsed:
                                     has_format_response = True
                                     is_structured_json = True
+                                    # Track text field for duplicate detection
+                                    if parsed.get('text'):
+                                        last_structured_text = parsed['text'][:100]
                                     print("✅ Found format_response_for_user JSON in text part", flush=True)
                                     sys.stdout.flush()
                             except:
                                 pass
-                            
-                            # Only skip text that is clearly a raw JSON echo of structured content
-                            # (not all plain text - sub-agent responses must pass through)
+
+                            # Skip text that is a duplicate of already-sent structured content
                             if has_format_response and not is_structured_json:
                                 stripped = text_content.strip()
-                                # Skip ONLY if text is a JSON object echo containing choices
+                                # Skip JSON object echoes containing choices
                                 if stripped.startswith('{') and ('"has_choices"' in stripped or '"choices"' in stripped):
                                     print(f"⏭️  Skipping JSON echo [{len(stripped)} chars]", flush=True)
                                     sys.stdout.flush()
                                     continue
-                                # Allow all other text through (sub-agent responses, follow-up text)
+                                # Skip plain text that duplicates the structured response text
+                                # Compare first ~80 chars (normalized) to detect echo
+                                if last_structured_text and len(stripped) > 50:
+                                    import re as _re2
+                                    # Normalize: remove markdown, extra whitespace, common prefixes
+                                    def _normalize(s):
+                                        s = _re2.sub(r'\*\*', '', s)  # remove bold markers
+                                        s = _re2.sub(r'\s+', ' ', s).strip().lower()
+                                        return s[:80]
+                                    if _normalize(stripped) == _normalize(last_structured_text):
+                                        print(f"⏭️  Skipping plain text duplicate [{len(stripped)} chars]", flush=True)
+                                        sys.stdout.flush()
+                                        continue
                             
                             collected_response += text_content
                             yield f"data: {json.dumps({'type': 'text', 'content': text_content})}\n\n"
@@ -747,6 +786,9 @@ async def chat_stream(request: ChatRequest):
                                     if isinstance(test_parsed, dict) and 'has_choices' in test_parsed:
                                         collected_response += clean_text
                                         yield f"data: {json.dumps({'type': 'text', 'content': clean_text})}\n\n"
+                                        # Track text for duplicate detection
+                                        if test_parsed.get('text'):
+                                            last_structured_text = test_parsed['text'][:100]
                                         print(f"✅ Sent clean structured response [{len(clean_text)} chars]", flush=True)
                                     else:
                                         collected_response += clean_text

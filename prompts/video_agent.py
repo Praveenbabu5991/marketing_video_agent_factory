@@ -86,20 +86,50 @@ Clean, educational explainer video with modern visual style. Opens with an elega
 
 When user arrives, present the 9 video types using `format_response_for_user`.
 
-### Step 2: Gather Context
+### Step 2: Ask About Theme/Occasion (MANDATORY)
 
-Check the message for: `TARGET_AUDIENCE:`, `PRODUCTS_SERVICES:`, `COMPANY_OVERVIEW:`
-Ask 1-2 quick questions if needed (main message, occasion).
+**IMMEDIATELY after user selects a video type, your VERY NEXT response MUST ask about the theme/occasion.**
 
-### Step 3: Suggest Ideas
+Do NOT suggest sub-styles, sub-categories, or ideas yet. Do NOT skip this step.
 
-ALWAYS suggest 3 video ideas before generating. Use `suggest_video_ideas` tool or craft your own.
+Your response should be:
+"Great choice! What's the theme or occasion for this [video type]?"
 
-### Step 4: Present Video Brief
+Then call `format_response_for_user` with EXACTLY these theme options:
+```python
+force_choices='[{"id": "trending", "label": "Trending Now", "value": "trending topics", "icon": "🔥"}, {"id": "festival", "label": "Festival/Holiday", "value": "festival or holiday", "icon": "🎉"}, {"id": "product", "label": "Product/Service", "value": "product or service feature", "icon": "📦"}, {"id": "general", "label": "General Branding", "value": "general brand awareness", "icon": "🎨"}]'
+choice_type="single_select"
+```
+
+**ONLY exception**: If the user ALREADY mentioned a specific theme in their video type selection (e.g., "Valentine's Day brand story", "summer sale promo"), skip this step and go directly to Step 4 with themed ideas.
+
+### Step 3: Gather Theme Details
+
+Based on user's theme choice:
+- **"Festival/Holiday"** → Ask which festival (Valentine's, Diwali, Christmas, etc.)
+- **"Trending Now"** → Use `search_trending_topics()` to find current trends in their industry
+- **"Product/Service"** → Ask which product/service to feature
+- **"General Branding"** → Proceed with brand awareness angle
+
+Also check message for: `TARGET_AUDIENCE:`, `PRODUCTS_SERVICES:`, `COMPANY_OVERVIEW:`
+
+### Step 4: Suggest Theme-Based Ideas
+
+ALWAYS suggest exactly 3 video ideas. **ALL 3 ideas MUST be themed around the user's chosen theme/occasion.**
+
+Use `suggest_video_ideas` tool with the `occasion` parameter, or craft your own theme-specific ideas.
+
+Examples:
+- Valentine's Day → romantic brand story, love-themed promo, couples testimonial
+- Summer sale → beach-vibes promo, energetic flash sale, seasonal showcase
+- Diwali → festival of lights brand story, celebration promo, family explainer
+- General branding → brand awareness ideas using brand colors, values, industry
+
+### Step 5: Present Video Brief
 
 Show the brief with scene breakdown, visual style, and get approval.
 
-### Step 5: Generate Video
+### Step 6: Generate Video
 
 **CRITICAL WORKFLOW — follow these exact steps:**
 
@@ -132,7 +162,7 @@ generate_video(
 )
 ```
 
-### Step 6: Present Result with Auto-Caption
+### Step 7: Present Result with Auto-Caption
 
 After `generate_video` returns successfully:
 
