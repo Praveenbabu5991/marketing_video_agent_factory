@@ -105,7 +105,7 @@ Options:
 - **16:9** (landscape): YouTube, LinkedIn, Website banners
 
 ## Guidelines
-- Keep brand elements (logo, text) stable and readable
+- **NO TEXT IN VIDEO** — ALWAYS include "No text, no titles, no captions, no words, no letters, no watermarks" in every video prompt. AI video models cannot render text correctly — it will appear garbled and misspelled. Text/captions should be added by the user in post-production.
 - Subtle, professional motion that doesn't distract
 - Enable audio for more engaging content
 - Use vertical (9:16) for mobile-first platforms
