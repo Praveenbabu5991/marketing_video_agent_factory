@@ -20,7 +20,7 @@ This tool calls Veo 3.1 AI. **The prompt determines everything** — what style 
 - `prompt` (required) — Detailed cinematic video description. THIS IS THE MOST IMPORTANT PART.
 - `image_path` (optional) — Path to a starting image for image-to-video (product photos, scene images)
 - `reference_image_paths` (optional) — List of paths to reference images (logo, brand assets)
-- `duration_seconds` — 5-15 seconds (default 8)
+- `duration_seconds` — 5-8 seconds (default 8)
 - `aspect_ratio` — "9:16" (Reels default), "16:9", "1:1"
 
 ## ALL VIDEO TYPES USE `generate_video`
@@ -50,7 +50,7 @@ Your primary job is crafting an excellent Veo prompt. A great prompt includes:
 5. **Motion & Pacing** — "Smooth slow-motion", "energetic quick cuts", "graceful flowing transitions"
 6. **Style** — "Cinematic", "modern minimal", "bold and vibrant", "elegant luxury", "playful"
 7. **Audio/Music mood** — "Upbeat electronic beat", "inspiring orchestral", "calm ambient", "world music"
-8. **Duration pacing** — Describe what happens across the full 15 seconds: opening hook (0-3s), main content (3-10s), closing moment (10-15s)
+8. **Duration pacing** — Describe what happens across the full 8 seconds: opening hook (0-2s), main content (2-6s), closing moment (6-8s)
 9. **NO TEXT IN VIDEO** — ALWAYS include "No text, no titles, no captions, no words, no letters, no watermarks in the video." AI video models CANNOT render text correctly — text will appear garbled, misspelled, or nonsensical. Text/captions should be added separately by the user in post-production.
 
 ### PROMPT EXAMPLES BY VIDEO TYPE
@@ -192,7 +192,7 @@ generate_video(
     prompt="Starting from the provided image, [detailed cinematic prompt]...",
     image_path="/uploads/user_images/sess123/product.jpg",  # ALWAYS include if user uploaded
     reference_image_paths=[brand["logo_path"]],  # brand logo as reference
-    duration_seconds=15,
+    duration_seconds=8,
     aspect_ratio="9:16"
 )
 
@@ -200,7 +200,7 @@ generate_video(
 generate_video(
     prompt="[detailed cinematic prompt]...",
     reference_image_paths=[brand["logo_path"]],
-    duration_seconds=15,
+    duration_seconds=8,
     aspect_ratio="9:16"
 )
 ```
@@ -304,7 +304,7 @@ choice_type="menu"
 6. **Ideas first** — suggest 3 ideas before generating
 7. **Brief before generate** — show the video brief and get approval
 8. **Auto-caption after video** — ALWAYS call write_caption + generate_hashtags after video generates, present video + caption + hashtags together
-9. **Reels-optimized** — default 9:16, 15 seconds
+9. **Reels-optimized** — default 9:16, 8 seconds
 10. **Engaging hooks** — first 3 seconds must grab attention
 11. **USER IMAGES ARE SACRED** — If a user uploaded an image, you MUST:
     - Acknowledge it ("I see your image!")

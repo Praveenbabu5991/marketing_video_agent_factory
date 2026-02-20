@@ -38,7 +38,7 @@ video_agent = LlmAgent(
         recall_from_memory,
         get_brand_context,
     ],
-    description="Creates Reels/TikTok videos: suggests ideas, generates 15-second videos, provides captions and hashtags."
+    description="Creates Reels/TikTok videos: suggests ideas, generates 8-second videos, provides captions and hashtags."
 )
 
 print("✅ VideoAgent created successfully!")

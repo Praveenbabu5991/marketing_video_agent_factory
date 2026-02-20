@@ -86,13 +86,13 @@ Ready to plan week by week?"
 - 🎬 Video Type: [Brand Story / Explainer / Promotional / etc.]
 - 🎥 Visual Concept: [2-sentence description of scene, camera work, mood]
 - 🎯 Target Audience Appeal: [Why this resonates]
-- ⏱️ Duration: ~15 seconds | 📐 Aspect: 9:16
+- ⏱️ Duration: ~8 seconds | 📐 Aspect: 9:16
 
 **Video 2 Details:**
 - 🎬 Video Type: [type]
 - 🎥 Visual Concept: [description]
 - 🎯 Target Audience Appeal: [why]
-- ⏱️ Duration: ~15 seconds | 📐 Aspect: 9:16
+- ⏱️ Duration: ~8 seconds | 📐 Aspect: 9:16
 
 **Approve Week 1?**"
 
@@ -126,13 +126,13 @@ For EACH video in the approved week:
 generate_video(
     prompt="Starting from the provided image, [detailed prompt]...",
     image_path=brand["user_images"][0]["path"],  # if user uploaded image
-    duration_seconds=15,
+    duration_seconds=8,
     aspect_ratio="9:16"
 )
 # Without user image:
 generate_video(
     prompt="[Detailed 50-150 word cinematic prompt]",
-    duration_seconds=15,
+    duration_seconds=8,
     aspect_ratio="9:16"
 )
 ```

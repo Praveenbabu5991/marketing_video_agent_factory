@@ -177,7 +177,7 @@ format_response_for_user(
 **1. The Unveiling Journey: Discover Your Next Escape**
 - Hook: "Dynamic lines and abstract shapes form a captivating path..."
 - Key Message: "Announcing a new destination..."
-- Duration: ~15-20 seconds
+- Duration: ~8 seconds
 
 **2. Green Initiative: Travel with Purpose**
 - Hook: "Intertwining green leaves organically grow..."
@@ -187,7 +187,7 @@ format_response_for_user(
 **3. Flash Getaway: Unlock Exclusive Deals!**
 - Hook: "Rapid, energetic animation of travel icons..."
 - Key Message: "Don't miss limited-time offers..."
-- Duration: ~10-15 seconds
+- Duration: ~8 seconds
 
 **Which idea do you like?** Click 1, 2, or 3 below!"
 

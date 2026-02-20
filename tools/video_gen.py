@@ -484,7 +484,7 @@ def generate_video(
     prompt: str,
     image_path: str = "",
     reference_image_paths: list[str] = [],
-    duration_seconds: int = 15,
+    duration_seconds: int = 8,
     aspect_ratio: str = "9:16",
     output_dir: str = "generated",
 ) -> dict:
@@ -494,9 +494,6 @@ def generate_video(
     This is the ONLY tool needed for ALL video types. The prompt determines
     what kind of video is created (brand story, product launch, motion graphics,
     talking head, explainer, etc.). Write a detailed, cinematic prompt.
-
-    For durations > 8 seconds, the video is auto-extended (Veo generates 8s,
-    then extends by 7s increments to reach the target duration).
 
     Args:
         prompt: The complete video generation prompt. Must be detailed and include:
@@ -511,8 +508,7 @@ def generate_video(
             Use for product showcases where you have a product photo.
         reference_image_paths: Optional. List of paths to reference images
             (logo, brand assets, style references) for Veo to use as visual guides.
-        duration_seconds: Target video length in seconds. Default 15.
-            Veo generates 8s initially, then auto-extends by 7s to reach target.
+        duration_seconds: Video length in seconds (5-8). Default 8.
         aspect_ratio: "9:16" (Reels/TikTok), "16:9" (YouTube), "1:1" (Feed).
         output_dir: Directory to save the generated video.
 
@@ -531,15 +527,14 @@ def generate_video(
     try:
         client = _get_client()
         video_model = os.getenv("VIDEO_MODEL", "veo-3.1-generate-preview")
-        target_duration = max(5, duration_seconds)
-        # Veo generates max 8s initially, then we extend by 7s to reach target
-        initial_duration = max(5, min(8, target_duration))
+        # Clamp duration to valid Veo range (5-8 seconds)
+        clamped_duration = max(5, min(8, duration_seconds))
 
         # Build config
         config_kwargs = {
             "aspect_ratio": aspect_ratio,
             "number_of_videos": 1,
-            "duration_seconds": initial_duration,
+            "duration_seconds": clamped_duration,
         }
 
         # Handle reference images (only for text-to-video; Veo API does NOT
@@ -627,45 +622,9 @@ def generate_video(
                 }
 
             video = result.generated_videos[0]
-            current_duration = initial_duration
-            print(f"  ✅ Initial {current_duration}s video generated")
+            print(f"  ✅ {clamped_duration}s video generated")
 
-            # Auto-extend to reach target duration (each extension adds ~7s)
-            extension_count = 0
-            while current_duration < target_duration and extension_count < 20:
-                extension_count += 1
-                print(f"  🔄 Extending video ({extension_count}): {current_duration}s → ~{current_duration + 7}s ...")
-                try:
-                    ext_operation = client.models.generate_videos(
-                        model=video_model,
-                        video=video.video,
-                        prompt=prompt,
-                        config=types.GenerateVideosConfig(
-                            number_of_videos=1,
-                        ),
-                    )
-                    ext_wait = 300
-                    while not ext_operation.done:
-                        time.sleep(10)
-                        ext_operation = client.operations.get(ext_operation)
-                        ext_wait -= 10
-                        elapsed = 300 - ext_wait
-                        print(f"  ⏳ Extension waiting... ({elapsed}s elapsed)")
-                        if ext_wait <= 0:
-                            print(f"  ⚠️ Extension timed out, using {current_duration}s video")
-                            break
-                    if ext_operation.done and ext_operation.result and ext_operation.result.generated_videos:
-                        video = ext_operation.result.generated_videos[0]
-                        current_duration += 7
-                        print(f"  ✅ Extended to ~{current_duration}s")
-                    else:
-                        print(f"  ⚠️ Extension failed, using {current_duration}s video")
-                        break
-                except Exception as ext_err:
-                    print(f"  ⚠️ Extension error: {ext_err}, using {current_duration}s video")
-                    break
-
-            # Save the final video
+            # Save the video
             output_path = Path(output_dir)
             output_path.mkdir(parents=True, exist_ok=True)
 
@@ -678,14 +637,14 @@ def generate_video(
             video.video.save(str(video_path))
 
             file_size = video_path.stat().st_size
-            print(f"  ✅ Video saved: {video_path} ({file_size:,} bytes, ~{current_duration}s)")
+            print(f"  ✅ Video saved: {video_path} ({file_size:,} bytes, ~{clamped_duration}s)")
 
             return {
                 "status": "success",
                 "video_path": str(video_path),
                 "filename": filename,
                 "url": f"/generated/{filename}",
-                "duration_seconds": current_duration,
+                "duration_seconds": clamped_duration,
                 "aspect_ratio": aspect_ratio,
                 "model": video_model,
                 "type": "generated",
@@ -715,7 +674,7 @@ def get_video_type_options() -> dict:
     """Get available video generation types with descriptions."""
     return {
         "options": [
-            {"id": "video_from_image", "label": "Video from Image", "icon": "🖼️", "description": "Upload your image and we create a promotional video around it (15s)", "requires_image": True, "styles": ["showcase", "cinematic_reveal", "promo", "social_ad"]},
+            {"id": "video_from_image", "label": "Video from Image", "icon": "🖼️", "description": "Upload your image and we create a promotional video around it (8s)", "requires_image": True, "styles": ["showcase", "cinematic_reveal", "promo", "social_ad"]},
             {"id": "motion_graphics", "label": "Motion Graphics", "icon": "✨", "description": "Create branded motion graphics for announcements (8s)", "requires_image": False, "styles": ["modern", "minimal", "bold", "elegant", "playful"]},
             {"id": "talking_head", "label": "AI Talking Head", "icon": "🎙️", "description": "AI presenter explains your product (external service)", "requires_image": False, "external": True, "styles": ["professional", "casual", "friendly", "corporate"]},
         ]
@@ -728,24 +687,24 @@ def suggest_video_ideas(
 ) -> dict:
     """Suggest video ideas based on brand context and video type."""
     product_ideas = [
-        {"title": "360 Product Showcase", "style": "showcase", "hook": "See every angle of our [product]", "description": "Smooth rotation revealing all product details", "duration": 15},
-        {"title": "Dramatic Reveal", "style": "unboxing", "hook": "Unbox something special...", "description": "Elegant unboxing experience with premium feel", "duration": 15},
-        {"title": "Feature Spotlight", "style": "zoom", "hook": "The detail that makes the difference", "description": "Cinematic zoom highlighting key features", "duration": 15},
-        {"title": "Lifestyle in Action", "style": "lifestyle", "hook": "Made for your everyday", "description": "Product being used naturally in an aspirational setting", "duration": 15},
+        {"title": "360 Product Showcase", "style": "showcase", "hook": "See every angle of our [product]", "description": "Smooth rotation revealing all product details", "duration": 8},
+        {"title": "Dramatic Reveal", "style": "unboxing", "hook": "Unbox something special...", "description": "Elegant unboxing experience with premium feel", "duration": 8},
+        {"title": "Feature Spotlight", "style": "zoom", "hook": "The detail that makes the difference", "description": "Cinematic zoom highlighting key features", "duration": 8},
+        {"title": "Lifestyle in Action", "style": "lifestyle", "hook": "Made for your everyday", "description": "Product being used naturally in an aspirational setting", "duration": 8},
     ]
 
     motion_ideas = [
-        {"title": "Bold Announcement", "style": "bold", "hook": "BIG NEWS!", "description": "High-impact text animation with dynamic movements", "duration": 15},
-        {"title": "Elegant Reveal", "style": "elegant", "hook": "Introducing something special...", "description": "Sophisticated motion graphics with premium feel", "duration": 15},
-        {"title": "Modern Promo", "style": "modern", "hook": "The future is here", "description": "Sleek, trendy animation with glass morphism effects", "duration": 15},
-        {"title": "Fun & Playful", "style": "playful", "hook": "Get ready for something fun!", "description": "Bouncy, energetic animation with vibrant colors", "duration": 15},
+        {"title": "Bold Announcement", "style": "bold", "hook": "BIG NEWS!", "description": "High-impact text animation with dynamic movements", "duration": 8},
+        {"title": "Elegant Reveal", "style": "elegant", "hook": "Introducing something special...", "description": "Sophisticated motion graphics with premium feel", "duration": 8},
+        {"title": "Modern Promo", "style": "modern", "hook": "The future is here", "description": "Sleek, trendy animation with glass morphism effects", "duration": 8},
+        {"title": "Fun & Playful", "style": "playful", "hook": "Get ready for something fun!", "description": "Bouncy, energetic animation with vibrant colors", "duration": 8},
     ]
 
     talking_ideas = [
         {"title": "Product Explainer", "style": "professional", "hook": "Let me tell you about...", "description": "Clear explanation of product features and benefits", "duration": 20},
-        {"title": "FAQ Answer", "style": "friendly", "hook": "You asked, we answered!", "description": "Address common customer questions", "duration": 15},
+        {"title": "FAQ Answer", "style": "friendly", "hook": "You asked, we answered!", "description": "Address common customer questions", "duration": 8},
         {"title": "Brand Story", "style": "professional", "hook": "Our story begins...", "description": "Share your brand's mission and values", "duration": 30},
-        {"title": "Quick Tip", "style": "casual", "hook": "Pro tip!", "description": "Share a useful tip related to your product/industry", "duration": 15},
+        {"title": "Quick Tip", "style": "casual", "hook": "Pro tip!", "description": "Share a useful tip related to your product/industry", "duration": 8},
     ]
 
     ideas = product_ideas if video_type in ("animated_product", "video_from_image") else motion_ideas if video_type == "motion_graphics" else talking_ideas
