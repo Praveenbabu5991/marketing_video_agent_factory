@@ -585,12 +585,43 @@ def generate_video(
                     source_image = Image.open(resolved_img)
                     if source_image.mode in ('RGBA', 'LA', 'P'):
                         source_image = source_image.convert('RGB')
+                    print(f"  ✅ Loaded starting image: {image_path} ({source_image.size})")
+
+                    # Composite logo onto image if reference_image_paths has a logo
+                    if reference_image_paths:
+                        for ref_path in reference_image_paths:
+                            resolved_logo = _resolve_image_path(ref_path)
+                            if os.path.exists(resolved_logo):
+                                try:
+                                    logo_img = Image.open(resolved_logo)
+                                    # Resize logo to ~15% of image width
+                                    img_w, img_h = source_image.size
+                                    logo_target_w = int(img_w * 0.15)
+                                    logo_w, logo_h = logo_img.size
+                                    logo_scale = logo_target_w / logo_w
+                                    logo_new_size = (logo_target_w, int(logo_h * logo_scale))
+                                    logo_resized = logo_img.resize(logo_new_size, Image.LANCZOS)
+
+                                    # Position: top-right corner with padding
+                                    padding = int(img_w * 0.03)
+                                    x = img_w - logo_new_size[0] - padding
+                                    y = padding
+
+                                    # Paste with transparency if logo has alpha
+                                    if logo_resized.mode == 'RGBA':
+                                        source_image.paste(logo_resized, (x, y), logo_resized)
+                                    else:
+                                        source_image.paste(logo_resized, (x, y))
+                                    print(f"  ✅ Composited logo onto image: {ref_path} ({logo_new_size})")
+                                except Exception as logo_err:
+                                    print(f"  ⚠️ Could not composite logo {ref_path}: {logo_err}")
+
                     buf = io.BytesIO()
                     source_image.save(buf, format='JPEG')
                     gen_kwargs["image"] = types.Image(
                         image_bytes=buf.getvalue(), mime_type="image/jpeg"
                     )
-                    print(f"  ✅ Using starting image: {image_path}")
+                    print(f"  ✅ Using composited image for Veo")
                 except Exception as e:
                     print(f"  ⚠️ Could not load starting image {image_path}: {e}")
             else:
