@@ -108,17 +108,28 @@ When user says "yes", "approve", "looks good":
 
 For EACH video in the approved week:
 
-1. **Call `get_brand_context()`** to get brand data (colors, logo, tone)
+1. **Call `get_brand_context()`** to get brand data (colors, logo, tone, user_images)
 
-2. **Craft a detailed Veo prompt** (50-150 words) incorporating:
+2. **Check for user images**: If `brand["user_images"]` has entries, use the first image's `path` as `image_path` in generate_video. Tell the user their image is being included.
+
+3. **Craft a detailed Veo prompt** (50-150 words) incorporating:
    - Brand colors as hex codes
    - Video type style (cinematic for brand story, energetic for promo, clean for explainer)
    - Camera work, lighting, pacing descriptions
    - Music/audio mood
+   - If using user image: describe how video animates from it
    - MUST end with: "No text, no titles, no captions, no words, no letters, no watermarks in the video."
 
-3. **Call `generate_video()`**:
+4. **Call `generate_video()`**:
 ```python
+# With user image:
+generate_video(
+    prompt="Starting from the provided image, [detailed prompt]...",
+    image_path=brand["user_images"][0]["path"],  # if user uploaded image
+    duration_seconds=15,
+    aspect_ratio="9:16"
+)
+# Without user image:
 generate_video(
     prompt="[Detailed 50-150 word cinematic prompt]",
     duration_seconds=15,
@@ -219,7 +230,7 @@ choice_type="menu"
 | Theme | Best Video Type | Why |
 |-------|----------------|-----|
 | Festival/Event | Brand Story / Promotional | Emotional connection or urgency |
-| Product Feature | Explainer / Animated Product | Shows functionality |
+| Product Feature | Explainer / Video from Image | Shows functionality |
 | Announcement | Motion Graphics / Product Launch | Eye-catching, shareable |
 | Tips/Education | Explainer / Educational | Clear, informative |
 | Sale/Offer | Promotional / Motion Graphics | Bold, urgent |

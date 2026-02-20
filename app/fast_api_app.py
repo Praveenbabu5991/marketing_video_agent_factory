@@ -516,9 +516,14 @@ async def chat_stream(request: ChatRequest):
         sys.stdout.flush()
         
         # Check if this is a brand setup completion message
-        brand_setup_keywords = ["set up my brand", "brand setup", "I've set up", "setup complete", 
-                               "brand configured", "Logo:", "Colors:", "Style:"]
-        is_brand_setup = any(keyword.lower() in sanitized_message.lower() for keyword in brand_setup_keywords)
+        # IMPORTANT: Only match the INITIAL brand setup message from sendBrandContext(),
+        # not follow-up messages that have "[Current brand context: ...]" appended.
+        # The initial brand setup message starts with "Brand information:" and contains
+        # "Brand setup complete" — regular messages just have bracketed context.
+        msg_lower = sanitized_message.lower()
+        is_brand_setup = (
+            "brand information:" in msg_lower and "brand setup complete" in msg_lower
+        )
         
         if is_brand_setup:
             print("✅ Detected brand setup completion - checking for video type guidance", flush=True)
@@ -824,9 +829,9 @@ async def chat_stream(request: ChatRequest):
                     resp_text += f" with your {color_desc} branding"
                     if style:
                         resp_text += f" and {style} style"
-                    resp_text += ". Great foundation! 🎨\n\nNow, let's create an amazing marketing video! I can help you create **9 different types of marketing videos**:\n\n**Marketing-Specific Types:**\n📖 Brand Story - Tell your mission and values\n🚀 Product Launch - Announce new products\n💡 Explainer - Show how services work\n⭐ Testimonial - Share customer stories\n📚 Educational - Tips and insights\n🎯 Promotional - Deals and campaigns\n\n**Creative Types:**\n📦 Animated Product - Showcase products\n✨ Motion Graphics - Eye-catching animations\n🎙️ AI Talking Head - AI presenter videos\n\n**Which type would you like to create?**"
-                    
-                    fc = '[{"id": "brand_story", "label": "Brand Story", "value": "brand story", "icon": "📖"}, {"id": "product_launch", "label": "Product Launch", "value": "product launch", "icon": "🚀"}, {"id": "explainer", "label": "Explainer", "value": "explainer", "icon": "💡"}, {"id": "testimonial", "label": "Testimonial", "value": "testimonial", "icon": "⭐"}, {"id": "educational", "label": "Educational", "value": "educational", "icon": "📚"}, {"id": "promotional", "label": "Promotional", "value": "promotional", "icon": "🎯"}, {"id": "animated_product", "label": "Animated Product", "value": "animated product", "icon": "📦"}, {"id": "motion_graphics", "label": "Motion Graphics", "value": "motion graphics", "icon": "✨"}, {"id": "talking_head", "label": "AI Talking Head", "value": "talking head", "icon": "🎙️"}]'
+                    resp_text += ". Great foundation! 🎨\n\nWhat would you like to create?\n\n✨ **Motion Graphics** - Eye-catching branded animations\n🖼️ **Video from Image** - Upload in 'Images for Posts' and we create a video\n📅 **Create Campaign** - Plan weeks of themed video content"
+
+                    fc = '[{"id": "motion_graphics", "label": "Motion Graphics", "value": "motion graphics", "icon": "✨"}, {"id": "video_from_image", "label": "Video from Image", "value": "video from my uploaded image", "icon": "🖼️"}, {"id": "campaign", "label": "Create Campaign", "value": "create campaign", "icon": "📅"}]'
                     
                     formatted = format_response_for_user(
                         response_text=resp_text, force_choices=fc,

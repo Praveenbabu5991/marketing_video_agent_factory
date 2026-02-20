@@ -2,7 +2,7 @@
 Video Generation Tools for Marketing Video Agent Factory.
 
 Provides specialized video generation functions:
-- Animated Product Videos (Veo 3.1 image-to-video)
+- Video from Image (Veo 3.1 image-to-video)
 - Motion Graphics (Veo 3.1 text-to-video)
 - AI Talking Head (external API placeholder)
 
@@ -542,8 +542,9 @@ def generate_video(
             "duration_seconds": initial_duration,
         }
 
-        # Handle reference images
-        if reference_image_paths:
+        # Handle reference images (only for text-to-video; Veo API does NOT
+        # support reference_images + image together in image-to-video mode)
+        if reference_image_paths and not image_path:
             ref_images = []
             for ref_path in reference_image_paths:
                 resolved = _resolve_image_path(ref_path)
@@ -569,6 +570,8 @@ def generate_video(
                     print(f"  ⚠️ Reference image not found: {resolved}")
             if ref_images:
                 config_kwargs["reference_images"] = ref_images
+        elif reference_image_paths and image_path:
+            print(f"  ℹ️ Skipping reference images (not supported with image-to-video mode)")
 
         video_config = types.GenerateVideosConfig(**config_kwargs)
 
@@ -691,12 +694,18 @@ def generate_video(
 
         except Exception as model_error:
             error_str = str(model_error).lower()
+            print(f"  ❌ Video generation error: {model_error}")
+            import traceback
+            traceback.print_exc()
             if any(x in error_str for x in ["not found", "invalid", "unavailable", "permission"]):
                 return {
                     "status": "model_unavailable",
-                    "message": f"Veo 3.1 not available: {str(model_error)[:200]}",
+                    "message": f"Veo 3.1 error: {str(model_error)[:300]}",
                 }
-            raise
+            return {
+                "status": "error",
+                "message": f"Video generation failed: {str(model_error)[:300]}",
+            }
 
     except Exception as e:
         return _format_error(e, "Try simplifying your video prompt.")
@@ -706,7 +715,7 @@ def get_video_type_options() -> dict:
     """Get available video generation types with descriptions."""
     return {
         "options": [
-            {"id": "animated_product", "label": "Animated Product Video", "icon": "📦", "description": "Transform product images into dynamic showcase videos (8s)", "requires_image": True, "styles": ["showcase", "zoom", "lifestyle", "unboxing"]},
+            {"id": "video_from_image", "label": "Video from Image", "icon": "🖼️", "description": "Upload your image and we create a promotional video around it (15s)", "requires_image": True, "styles": ["showcase", "cinematic_reveal", "promo", "social_ad"]},
             {"id": "motion_graphics", "label": "Motion Graphics", "icon": "✨", "description": "Create branded motion graphics for announcements (8s)", "requires_image": False, "styles": ["modern", "minimal", "bold", "elegant", "playful"]},
             {"id": "talking_head", "label": "AI Talking Head", "icon": "🎙️", "description": "AI presenter explains your product (external service)", "requires_image": False, "external": True, "styles": ["professional", "casual", "friendly", "corporate"]},
         ]
@@ -739,7 +748,7 @@ def suggest_video_ideas(
         {"title": "Quick Tip", "style": "casual", "hook": "Pro tip!", "description": "Share a useful tip related to your product/industry", "duration": 15},
     ]
 
-    ideas = product_ideas if video_type == "animated_product" else motion_ideas if video_type == "motion_graphics" else talking_ideas
+    ideas = product_ideas if video_type in ("animated_product", "video_from_image") else motion_ideas if video_type == "motion_graphics" else talking_ideas
 
     customized_ideas = []
     for idea in ideas[:4]:

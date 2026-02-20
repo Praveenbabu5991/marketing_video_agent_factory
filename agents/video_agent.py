@@ -2,7 +2,7 @@
 Video Agent - Creates video content using Veo 3.1 and external services.
 
 Handles three types of video generation:
-1. Animated Product Videos - Transform product images into showcase videos
+1. Video from Image - Transform user's uploaded images into promotional videos
 2. Motion Graphics - Create branded motion graphics from text
 3. AI Talking Head - Guide users to external AI presenter services
 """
